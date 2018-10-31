@@ -8,18 +8,16 @@ logging.basicConfig(level=logging.CRITICAL, format=LOG_FORMAT)
 log = logging.getLogger(__name__)
 log.setLevel(LOG_LEVEL)
 
-clients = {}
-addresses = {}
 
-def accept_incoming_connections():
+def accept_incoming_connections(server):
     """
     A handler for all new incoming connections.
     """
     while True:
-        client, client_address = SERVER.accept()
+        client, client_address = server.accept()
         log.info('{} has connected.'.format(client_address))
         client.send(bytes('This is a public chat room.' + 'Type in your name and press enter to start!', 'utf8'))
-        addresses[client] = client_address
+        ADDRESSES[client] = client_address
         Thread(target=handle_client, args=(client,)).start()
 
 def handle_client(client):
@@ -30,7 +28,7 @@ def handle_client(client):
     client.send(bytes('Welcome {}! If you ever want to quit, type "exit" to leave.'.format(username), 'utf8'))
     broadcast(bytes('{} has joined the chat!'.format(username), 'utf8'))
     log.info('{} joined the chat'.format(username))
-    clients[client] = username
+    CLIENTS[client] = username
     while True:
         message = client.recv(BUFSIZ)
         if message != bytes('exit', 'utf8'):
@@ -38,7 +36,7 @@ def handle_client(client):
         else:
             client.send(bytes('exit', 'utf8'))
             client.close()
-            del clients[client]
+            del CLIENTS[client]
             broadcast(bytes('{} has left the chat.'.format(username), 'utf8'))
             break
 
@@ -46,7 +44,7 @@ def broadcast(message):
     """
     Broadcasts a message to all the clients.
     """
-    for socket in clients:
+    for socket in CLIENTS:
         socket.send(bytes(message, 'utf8'))
 
 def main():
@@ -54,7 +52,8 @@ def main():
     SERVER.bind((HOST, PORT))
     SERVER.listen(MAX_CONNECTIONS)
     log.info('Waiting for connection...')
-    ACCEPT_THREAD = Thread(target=accept_incoming_connections)
+    ACCEPT_THREAD = Thread(target=accept_incoming_connections, args=[SERVER])
+    ACCEPT_THREAD.start()
     ACCEPT_THREAD.join()
     SERVER.close()
 
